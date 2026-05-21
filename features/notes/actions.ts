@@ -15,17 +15,15 @@ async function extractText(file: File): Promise<string> {
   if (ext === "txt" || ext === "md") {
     return buffer.toString("utf-8").slice(0, 50000);
   }
-
   if (ext === "pdf") {
     try {
       const pdfParse = require2("pdf-parse");
       const data = await pdfParse(buffer);
       return (data.text as string).slice(0, 50000);
     } catch {
-      return `[PDF: ${file.name} — content stored as file]`;
+      return `[PDF: ${file.name} — stored as file]`;
     }
   }
-
   if (ext === "docx" || ext === "doc") {
     try {
       const mammoth = require2("mammoth");
@@ -35,64 +33,87 @@ async function extractText(file: File): Promise<string> {
       return `[Word Document: ${file.name}]`;
     }
   }
-
   if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
     return `[Image: ${file.name}]`;
   }
-
   if (["pptx", "ppt"].includes(ext)) {
     return `[Presentation: ${file.name}]`;
   }
-
   return `[File: ${file.name}]`;
+}
+
+// ─── Gemini AI helper (FREE tier) ────────────────────────────────
+async function callGemini(prompt: string, systemPrompt?: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+  const contents: any[] = [];
+
+  // Gemini uses a system_instruction field, not a system role message
+  const body: any = {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 1024,
+    },
+  };
+
+  if (systemPrompt) {
+    body.system_instruction = { parts: [{ text: systemPrompt }] };
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini error ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
 // ─── AI Summary ──────────────────────────────────────────────────
 async function generateSummary(text: string, title: string): Promise<{ summary: string; tags: string[] }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return { summary: "Add ANTHROPIC_API_KEY to Vercel environment variables to enable AI summaries.", tags: [] };
+    return {
+      summary: "Add GEMINI_API_KEY to Vercel environment variables to enable AI summaries. Get a free key at aistudio.google.com",
+      tags: [],
+    };
   }
 
   const prompt = `Analyze this document and respond ONLY with valid JSON (no markdown, no backticks, no explanation).
 
 Document title: "${title}"
-Document content:
+Content:
 ${text.slice(0, 8000)}
 
-Respond with exactly this JSON structure:
-{"summary":"3-5 sentence summary of key points","tags":["tag1","tag2","tag3"]}`;
+Respond with exactly this JSON:
+{"summary":"3-5 sentence summary of the key points","tags":["tag1","tag2","tag3","tag4"]}`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 512,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!res.ok) throw new Error(`${res.status}`);
-    const data = await res.json();
-    const raw = (data.content?.[0]?.text ?? "{}").trim();
-    const parsed = JSON.parse(raw);
+    const raw = await callGemini(prompt);
+    // Strip any markdown fences if Gemini adds them
+    const clean = raw.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
     return {
       summary: parsed.summary ?? "Summary unavailable.",
       tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 6) : [],
     };
   } catch (e) {
     console.error("AI summary error:", e);
-    return { summary: "Could not generate AI summary.", tags: [] };
+    return { summary: "Could not generate AI summary for this document.", tags: [] };
   }
 }
 
-// ─── Upload action ────────────────────────────────────────────────
+// ─── Upload + Process ─────────────────────────────────────────────
 export async function uploadAndProcessFile(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -100,7 +121,7 @@ export async function uploadAndProcessFile(formData: FormData) {
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "No file provided." };
-  if (file.size > 50 * 1024 * 1024) return { error: "File too large. Maximum size is 50MB." };
+  if (file.size > 50 * 1024 * 1024) return { error: "File too large. Maximum 50MB." };
 
   try {
     // 1. Upload to Supabase Storage
@@ -114,11 +135,11 @@ export async function uploadAndProcessFile(formData: FormData) {
     // 2. Extract text
     const extractedText = await extractText(file);
 
-    // 3. AI summary
+    // 3. AI summary (free Gemini)
     const title = file.name.replace(/\.[^/.]+$/, "");
     const { summary, tags } = await generateSummary(extractedText, title);
 
-    // 4. Save note
+    // 4. Save note to DB
     const { data: note, error: noteError } = await (supabase as any)
       .from("notes")
       .insert({ user_id: user.id, title, content: extractedText, summary, tags, is_public: false })
@@ -141,14 +162,17 @@ export async function uploadAndProcessFile(formData: FormData) {
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/notes");
 
-    return { success: true, note: { id: note.id, title: note.title, summary: note.summary, tags: note.tags } };
+    return {
+      success: true,
+      note: { id: note.id, title: note.title, summary: note.summary, tags: note.tags },
+    };
   } catch (err) {
     console.error("Upload error:", err);
-    return { error: "An unexpected error occurred." };
+    return { error: "An unexpected error occurred during upload." };
   }
 }
 
-// ─── Chat action ──────────────────────────────────────────────────
+// ─── AI Chat ─────────────────────────────────────────────────────
 export async function chatWithNotes(
   message: string,
   noteIds: string[],
@@ -158,57 +182,78 @@ export async function chatWithNotes(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated." };
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { error: "ANTHROPIC_API_KEY not configured. Add it to Vercel environment variables." };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return {
+      error:
+        "GEMINI_API_KEY not configured. Get a free key at aistudio.google.com and add it to Vercel environment variables.",
+    };
+  }
 
-  // Fetch notes context
-  let context = "";
+  // Fetch user's notes as context
   const { data: notes } = await (supabase as any)
     .from("notes")
     .select("title, content, summary, tags")
     .eq("user_id", user.id)
     .limit(8);
 
-  if (notes?.length) {
-    context = notes
-      .map((n: any) => `### ${n.title}\nSummary: ${n.summary ?? "N/A"}\nContent: ${(n.content ?? "").slice(0, 2000)}`)
-      .join("\n\n---\n\n");
+  const context = notes?.length
+    ? notes
+        .map(
+          (n: any) =>
+            `### ${n.title}\nSummary: ${n.summary ?? "N/A"}\nContent: ${(n.content ?? "").slice(0, 2000)}`
+        )
+        .join("\n\n---\n\n")
+    : null;
+
+  const systemPrompt = `You are NoteForge AI, an expert study assistant. Help users understand, review, and learn from their uploaded documents.
+
+${
+  context
+    ? `Here is content from the user's notes:\n\n${context}`
+    : "The user hasn't uploaded any notes yet. Encourage them to go to the Upload page and add some documents."
+}
+
+Be concise, helpful, and educational. When referencing notes, mention the document title. Use bullet points for lists.`;
+
+  // Build conversation for Gemini (alternating user/model turns)
+  const geminiContents: any[] = [];
+
+  // Add history (last 10 messages, must alternate user/model)
+  const recentHistory = history.slice(-10);
+  for (const msg of recentHistory) {
+    geminiContents.push({
+      role: msg.role === "assistant" ? "model" : "user",
+      parts: [{ text: msg.content }],
+    });
   }
 
-  const systemPrompt = `You are NoteForge AI, an expert study assistant. Help users understand their uploaded notes and documents.
-
-${context
-  ? `Here is content from the user's notes:\n\n${context}`
-  : "The user hasn't uploaded any notes yet. Encourage them to upload documents on the Upload page."}
-
-Be concise, helpful, and educational. Cite document titles when referencing specific notes.`;
+  // Add current message
+  geminiContents.push({ role: "user", parts: [{ text: message }] });
 
   try {
-    const messages = [
-      ...history.slice(-10).map((m) => ({ role: m.role, content: m.content })),
-      { role: "user" as const, content: message },
-    ];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages,
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: geminiContents,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
       }),
     });
 
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Gemini error ${res.status}: ${err}`);
+    }
+
     const data = await res.json();
-    return { reply: data.content?.[0]?.text ?? "No response." };
-  } catch (err) {
+    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "I couldn't generate a response.";
+    return { reply };
+  } catch (err: any) {
     console.error("Chat error:", err);
-    return { error: "Failed to get AI response." };
+    return { error: `AI error: ${err.message}` };
   }
 }
