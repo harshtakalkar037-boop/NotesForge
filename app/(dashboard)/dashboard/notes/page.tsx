@@ -9,16 +9,14 @@ export default function NotesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Notes</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            All your uploaded notes and documents
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">All your uploaded notes and documents</p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/upload">
+        <Link href="/dashboard/upload">
+          <Button>
             <Plus className="h-4 w-4" />
             New Note
-          </Link>
-        </Button>
+          </Button>
+        </Link>
       </div>
 
       <div className="flex gap-3">
@@ -41,12 +39,12 @@ export default function NotesPage() {
           <p className="text-muted-foreground text-sm mb-6 max-w-sm">
             Upload your first document to start building your AI-powered knowledge base.
           </p>
-          <Button asChild>
-            <Link href="/dashboard/upload">
+          <Link href="/dashboard/upload">
+            <Button>
               <Upload className="h-4 w-4" />
               Upload Your First Note
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </CardContent>
       </Card>
     </div>
