@@ -53,22 +53,22 @@ export function TopNav({ user }: TopNavProps) {
 
       <div className="flex items-center gap-1 ml-auto">
         <ThemeToggle />
+
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-4 w-4" />
           <span className="absolute top-2.5 right-2.5 h-1.5 w-1.5 rounded-full bg-indigo-500" />
         </Button>
 
+        {/* User dropdown — trigger is a plain div, NOT asChild Button */}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-2 pl-2 pr-3 h-9">
-              <Avatar className="h-7 w-7">
-                <AvatarImage src={user?.user_metadata?.avatar_url} />
-                <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-              </Avatar>
-              <span className="hidden sm:block text-sm font-medium max-w-[120px] truncate">
-                {name}
-              </span>
-            </Button>
+          <DropdownMenuTrigger className="flex items-center gap-2 pl-2 pr-3 h-9 rounded-lg hover:bg-accent transition-colors outline-none">
+            <Avatar className="h-7 w-7">
+              <AvatarImage src={user?.user_metadata?.avatar_url} />
+              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+            </Avatar>
+            <span className="hidden sm:block text-sm font-medium max-w-[120px] truncate">
+              {name}
+            </span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuLabel className="font-normal">
