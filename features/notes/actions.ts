@@ -35,61 +35,66 @@ async function extractText(file: File): Promise<string> {
   return `[File: ${file.name}]`;
 }
 
-// ─── Gemini with model fallback ───────────────────────────────────
-const GEMINI_MODELS = [
-  "gemini-2.0-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-1.5-pro",
-  "gemini-1.5-flash-latest",
+// ─── AI provider: Groq (free, fast, no billing needed) ───────────
+// Models in fallback order
+const GROQ_MODELS = [
+  "llama-3.1-8b-instant",
+  "llama3-8b-8192",
+  "mixtral-8x7b-32768",
+  "gemma2-9b-it",
 ];
 
-async function callGemini(
+async function callAI(
   prompt: string,
   systemPrompt: string,
-  contents?: any[]
+  history?: { role: "user" | "assistant"; content: string }[]
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error("GROQ_API_KEY not set — add it to Vercel environment variables. Get a free key at console.groq.com");
 
-  for (const model of GEMINI_MODELS) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const messages: any[] = [
+    { role: "system", content: systemPrompt },
+    ...(history ?? []).slice(-10),
+    { role: "user", content: prompt },
+  ];
 
-    const body: any = {
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: contents ?? [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
-    };
-
+  for (const model of GROQ_MODELS) {
     try {
-      const res = await fetch(url, {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.5,
+          max_tokens: 1024,
+        }),
       });
 
-      // On quota or model-not-found errors, try next model
-      if (res.status === 429 || res.status === 503 || res.status === 404) {
-        console.warn(`Model ${model} quota exceeded, trying next...`);
+      if (res.status === 429 || res.status === 503) {
+        console.warn(`Groq model ${model} rate limited, trying next...`);
         continue;
       }
 
       if (!res.ok) {
         const err = await res.text();
-        throw new Error(`Gemini ${res.status}: ${err}`);
+        // Try next model on any error
+        console.warn(`Groq model ${model} error: ${err}`);
+        continue;
       }
 
       const data = await res.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      return data.choices?.[0]?.message?.content ?? "";
     } catch (e: any) {
-      if (e.message?.includes("429") || e.message?.includes("quota")) {
-        console.warn(`Model ${model} failed with quota, trying next...`);
-        continue;
-      }
-      throw e;
+      console.warn(`Groq model ${model} failed:`, e.message);
+      continue;
     }
   }
 
-  throw new Error("All Gemini models are currently over quota. Please try again in a minute.");
+  throw new Error("AI service temporarily unavailable. Please try again in a moment.");
 }
 
 // ─── AI Summary ──────────────────────────────────────────────────
@@ -97,10 +102,10 @@ async function generateSummary(
   text: string,
   title: string
 ): Promise<{ summary: string; tags: string[] }> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return {
-      summary: "Add GEMINI_API_KEY to Vercel environment variables to enable AI summaries. Get a free key at aistudio.google.com",
+      summary: "Add GROQ_API_KEY to Vercel environment variables to enable AI summaries. Get a free key at console.groq.com",
       tags: [],
     };
   }
@@ -113,7 +118,7 @@ Respond with ONLY this JSON (no markdown, no backticks):
 {"summary":"3-5 sentence summary of the key points","tags":["tag1","tag2","tag3","tag4"]}`;
 
   try {
-    const raw = await callGemini(prompt, "You are a document summarizer. Always respond with valid JSON only.");
+    const raw = await callAI(prompt, "You are a document summarizer. Always respond with valid JSON only. No markdown, no backticks.");
     const clean = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(clean);
     return {
@@ -263,19 +268,8 @@ ${
 
 Be concise, helpful, and educational. When referencing notes, mention the document title. Use bullet points for lists.`;
 
-  // Build Gemini conversation (alternating user/model)
-  const geminiContents: any[] = [];
-  const recentHistory = history.slice(-10);
-  for (const msg of recentHistory) {
-    geminiContents.push({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }],
-    });
-  }
-  geminiContents.push({ role: "user", parts: [{ text: message }] });
-
   try {
-    const reply = await callGemini(message, systemPrompt, geminiContents);
+    const reply = await callAI(message, systemPrompt, history.slice(-10));
     return { reply: reply || "I couldn't generate a response. Please try again." };
   } catch (err: any) {
     console.error("Chat error:", err);
