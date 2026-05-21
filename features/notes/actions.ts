@@ -38,9 +38,9 @@ async function extractText(file: File): Promise<string> {
 // ─── Gemini with model fallback ───────────────────────────────────
 const GEMINI_MODELS = [
   "gemini-2.0-flash-lite",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-flash",
   "gemini-2.0-flash",
+  "gemini-1.5-pro",
+  "gemini-1.5-flash-latest",
 ];
 
 async function callGemini(
@@ -67,8 +67,8 @@ async function callGemini(
         body: JSON.stringify(body),
       });
 
-      // On 429/quota, try next model
-      if (res.status === 429 || res.status === 503) {
+      // On quota or model-not-found errors, try next model
+      if (res.status === 429 || res.status === 503 || res.status === 404) {
         console.warn(`Model ${model} quota exceeded, trying next...`);
         continue;
       }
