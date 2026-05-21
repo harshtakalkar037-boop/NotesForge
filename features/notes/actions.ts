@@ -47,7 +47,7 @@ async function callGemini(prompt: string, systemPrompt?: string): Promise<string
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const contents: any[] = [];
 
@@ -232,7 +232,7 @@ Be concise, helpful, and educational. When referencing notes, mention the docume
   geminiContents.push({ role: "user", parts: [{ text: message }] });
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     const res = await fetch(url, {
       method: "POST",
