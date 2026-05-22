@@ -29,7 +29,7 @@ function MouseSpotlight() {
         top: springY,
         translateX: "-50%",
         translateY: "-50%",
-        background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)",
+        background: "radial-gradient(circle, rgba(99,102,241,0.25) 0%, rgba(139,92,246,0.1) 50%, transparent 70%)",
         position: "fixed",
         width: "600px",
         height: "600px",
@@ -46,39 +46,41 @@ function AnimatedGrid() {
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* Base dark */}
-      <div className="absolute inset-0 bg-[#030712]" />
+      <div className="absolute inset-0" style={{ backgroundColor: "#030712" }} />
+      {/* Vivid top glow */}
+      <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.8), rgba(139,92,246,0.8), transparent)" }} />
+      {/* Center bottom ambient */}
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-[400px] opacity-40" style={{ background: "radial-gradient(ellipse at center bottom, rgba(99,102,241,0.4) 0%, transparent 60%)" }} />
 
       {/* Animated gradient orbs */}
       <motion.div
         animate={{ x: [0, 80, 0], y: [0, -60, 0], scale: [1, 1.2, 1] }}
         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
         className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(79,70,229,0.25) 0%, transparent 65%)", filter: "blur(60px)" }}
+        style={{ background: "radial-gradient(circle, rgba(99,102,241,0.6) 0%, rgba(79,70,229,0.35) 40%, transparent 70%)", filter: "blur(40px)" }}
       />
       <motion.div
         animate={{ x: [0, -60, 0], y: [0, 80, 0], scale: [1.2, 1, 1.2] }}
         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut", delay: 3 }}
         className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 65%)", filter: "blur(80px)" }}
+        style={{ background: "radial-gradient(circle, rgba(139,92,246,0.55) 0%, rgba(109,40,217,0.3) 40%, transparent 70%)", filter: "blur(40px)" }}
       />
       <motion.div
         animate={{ x: [0, 40, -40, 0], y: [0, 50, -30, 0], scale: [1, 1.15, 0.95, 1] }}
         transition={{ duration: 25, repeat: Infinity, ease: "easeInOut", delay: 6 }}
         className="absolute top-[30%] right-[20%] w-[40vw] h-[40vw] rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 65%)", filter: "blur(60px)" }}
+        style={{ background: "radial-gradient(circle, rgba(6,182,212,0.4) 0%, rgba(8,145,178,0.2) 40%, transparent 70%)", filter: "blur(40px)" }}
       />
 
       {/* Grid lines */}
       <div
-        className="absolute inset-0 opacity-[0.035]"
+        className="absolute inset-0 opacity-100"
         style={{
-          backgroundImage: "linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(rgba(99,102,241,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.15) 1px, transparent 1px)",
           backgroundSize: "72px 72px",
         }}
       />
 
-      {/* Radial fade on grid edges */}
-      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 80% 60% at 50% 50%, transparent 40%, #030712 100%)" }} />
 
       {/* Noise texture overlay */}
       <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")" }} />
@@ -256,7 +258,7 @@ export function LandingPage() {
   }, []);
 
   return (
-    <div className="bg-[#030712] text-white overflow-x-hidden selection:bg-indigo-500/30">
+    <div style={{ backgroundColor: "#030712" }} className="text-white overflow-x-hidden">
       <MouseSpotlight />
 
       {/* ══ NAVBAR ══ */}
