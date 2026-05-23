@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Sparkles, LayoutDashboard, FileText, Upload, MessageSquare, Bookmark, Settings } from "lucide-react";
+import { Menu, X, Sparkles, LayoutDashboard, FileText, Upload, MessageSquare, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -11,7 +11,6 @@ const navItems = [
   { label: "Notes", href: "/dashboard/notes", icon: FileText },
   { label: "Upload", href: "/dashboard/upload", icon: Upload },
   { label: "AI Chat", href: "/dashboard/chat", icon: MessageSquare },
-  { label: "Bookmarks", href: "/dashboard/bookmarks", icon: Bookmark },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -21,67 +20,49 @@ export function MobileSidebar() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="md:hidden p-2 rounded-lg hover:bg-accent transition-colors"
-        aria-label="Open menu"
+      <button onClick={() => setOpen(true)} className="md:hidden p-2 rounded-lg transition-colors"
+        style={{ color: "rgba(255,255,255,0.5)" }}
+        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
       >
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Overlay */}
       {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
-          onClick={() => setOpen(false)}
-        />
+        <div className="fixed inset-0 z-40 md:hidden" onClick={() => setOpen(false)}
+          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} />
       )}
 
-      {/* Drawer */}
-      <div
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border flex flex-col transition-transform duration-300 md:hidden",
-          open ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="h-16 flex items-center justify-between px-5 border-b border-border">
-          <Link
-            href="/"
-            className="flex items-center gap-2 font-bold text-base"
-            onClick={() => setOpen(false)}
-          >
-            <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center">
-              <Sparkles className="h-3.5 w-3.5 text-white" />
+      <div className={cn(
+        "fixed inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-300 md:hidden",
+        open ? "translate-x-0" : "-translate-x-full"
+      )} style={{ backgroundColor: "#060610", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
+
+        <div className="h-16 flex items-center justify-between px-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+          <Link href="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
+            <div className="h-8 w-8 rounded-xl flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+              <Sparkles className="h-4 w-4 text-white" />
             </div>
-            NoteForge AI
+            <span className="font-bold text-white">NoteForge <span style={{ color: "#818cf8" }}>AI</span></span>
           </Link>
-          <button
-            onClick={() => setOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-accent transition-colors"
-          >
+          <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg" style={{ color: "rgba(255,255,255,0.4)" }}>
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-5 space-y-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
-                  isActive
-                    ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                )}
-              >
-                <Icon className="h-4 w-4 shrink-0" />
+              <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+                style={isActive ? {
+                  background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.08))",
+                  border: "1px solid rgba(99,102,241,0.2)", color: "white",
+                } : { color: "rgba(255,255,255,0.4)", border: "1px solid transparent" }}>
+                <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-indigo-400" : "text-current")} />
                 {item.label}
               </Link>
             );

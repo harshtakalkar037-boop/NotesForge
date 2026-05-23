@@ -4,92 +4,77 @@ import Link from "next/link";
 import {
   ArrowLeft, FileText, Sparkles, Clock, Tag,
   Download, ExternalLink, File, Image as ImageIcon,
-  Presentation, BookOpen
+  Presentation, BookOpen, User
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRelativeTime, formatBytes } from "@/lib/utils";
 
 const FILE_ICONS: Record<string, React.ElementType> = {
-  pdf: FileText,
-  docx: File, doc: File,
+  pdf: FileText, docx: File, doc: File,
   pptx: Presentation, ppt: Presentation,
   txt: BookOpen, md: BookOpen,
   png: ImageIcon, jpg: ImageIcon, jpeg: ImageIcon, webp: ImageIcon, gif: ImageIcon,
 };
-
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
 
-export default async function NoteDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function NoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
-
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch the note (public notes visible to all, own notes always visible)
-  const { data: note } = await (supabase as any)
-    .from("notes")
-    .select("*")
-    .eq("id", id)
-    .single();
-
+  const { data: note } = await (supabase as any).from("notes").select("*").eq("id", id).single();
   if (!note) notFound();
-
-  // Check access - own note or public note
   if (note.user_id !== user?.id && !note.is_public) notFound();
 
-  // Fetch the file record for this note
-  const { data: files } = await (supabase as any)
-    .from("note_files")
-    .select("*")
-    .eq("note_id", id);
+  const { data: files } = await (supabase as any).from("note_files").select("*").eq("note_id", id);
 
-  // Get signed URLs for all files (1 hour expiry)
   const filesWithUrls = await Promise.all(
     (files ?? []).map(async (file: any) => {
-      const { data } = await supabase.storage
-        .from("note-files")
-        .createSignedUrl(file.storage_path, 60 * 60);
+      const { data } = await supabase.storage.from("note-files").createSignedUrl(file.storage_path, 60 * 60);
       return { ...file, signedUrl: data?.signedUrl ?? null };
     })
   );
 
-  // Fetch uploader profile
-  const { data: profile } = await (supabase as any)
-    .from("profiles")
-    .select("full_name, email")
-    .eq("id", note.user_id)
-    .single();
-
+  const { data: profile } = await (supabase as any).from("profiles").select("full_name, email").eq("id", note.user_id).single();
   const uploaderName = profile?.full_name ?? profile?.email?.split("@")[0] ?? "Anonymous";
   const isOwner = user?.id === note.user_id;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* Back button */}
+      {/* Back */}
       <Link href="/dashboard/notes">
-        <Button variant="ghost" size="sm" className="gap-2 -ml-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Notes
-        </Button>
+        <button className="flex items-center gap-2 text-sm font-medium transition-all hover:translate-x-0.5"
+          style={{ color: "rgba(255,255,255,0.4)" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "white")}
+          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Notes
+        </button>
       </Link>
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold mb-2 leading-tight">{note.title}</h1>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              {formatRelativeTime(note.created_at)}
+      {/* Note header */}
+      <div className="rounded-2xl p-6 relative overflow-hidden"
+        style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="absolute top-0 left-0 right-0 h-0.5"
+          style={{ background: "linear-gradient(90deg, #6366f1, #8b5cf6, #06b6d4)" }} />
+        <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full blur-3xl opacity-10 pointer-events-none"
+          style={{ background: "radial-gradient(circle, #6366f1, transparent)" }} />
+
+        <div className="relative">
+          <h1 className="text-2xl font-black text-white mb-3 leading-tight">{note.title}</h1>
+          <div className="flex flex-wrap items-center gap-3 text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
+            <span className="flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> {uploaderName}
             </span>
-            <span>by <span className="font-medium text-foreground">{uploaderName}</span></span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" /> {formatRelativeTime(note.created_at)}
+            </span>
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-green-400"
+              style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
+              Public
+            </span>
             {isOwner && (
-              <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-xs border border-indigo-500/20">
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.2)" }}>
                 Your note
               </span>
             )}
@@ -98,217 +83,186 @@ export default async function NoteDetailPage({
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* Main content - left 2/3 */}
-        <div className="lg:col-span-2 space-y-6">
-
-          {/* File viewer */}
-          {filesWithUrls.length > 0 && filesWithUrls.map((file: any) => {
+        {/* Main - file viewer */}
+        <div className="lg:col-span-2 space-y-5">
+          {filesWithUrls.map((file: any) => {
             const ext = file.file_name?.split(".").pop()?.toLowerCase() ?? "";
             const isImage = IMAGE_EXTS.includes(ext);
             const isPdf = ext === "pdf";
             const Icon = FILE_ICONS[ext] ?? File;
 
             return (
-              <Card key={file.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-indigo-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{file.file_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {ext.toUpperCase()} • {formatBytes(file.file_size)}
-                        </p>
-                      </div>
+              <div key={file.id} className="rounded-2xl overflow-hidden"
+                style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                {/* File header */}
+                <div className="flex items-center justify-between p-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-xl flex items-center justify-center"
+                      style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                      <Icon className="h-4.5 w-4.5 h-5 w-5" style={{ color: "#818cf8" }} />
                     </div>
-                    {file.signedUrl && (
-                      <div className="flex gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{file.file_name}</p>
+                      <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+                        {ext.toUpperCase()} · {formatBytes(file.file_size)}
+                      </p>
+                    </div>
+                  </div>
+                  {file.signedUrl && (
+                    <div className="flex gap-2">
+                      <a href={file.signedUrl} target="_blank" rel="noopener noreferrer">
+                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
+                          style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                          <ExternalLink className="h-3.5 w-3.5" /> Open
+                        </button>
+                      </a>
+                      <a href={file.signedUrl} download={file.file_name}>
+                        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
+                          style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                          <Download className="h-3.5 w-3.5" /> Download
+                        </button>
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* File content */}
+                {isImage && file.signedUrl && (
+                  <div className="p-3">
+                    <div className="rounded-xl overflow-hidden" style={{ background: "rgba(0,0,0,0.3)" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={file.signedUrl} alt={file.file_name} className="w-full max-h-[600px] object-contain" />
+                    </div>
+                  </div>
+                )}
+
+                {isPdf && file.signedUrl && (
+                  <div className="p-3">
+                    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.05)" }}>
+                      <iframe src={`${file.signedUrl}#toolbar=1`} className="w-full h-[700px]" title={file.file_name} />
+                    </div>
+                  </div>
+                )}
+
+                {!isImage && !isPdf && file.signedUrl && (
+                  <div className="flex flex-col items-center justify-center py-14 gap-5">
+                    <div className="h-16 w-16 rounded-2xl flex items-center justify-center"
+                      style={{ background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                      <Icon className="h-8 w-8" style={{ color: "#818cf8" }} />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-semibold text-white mb-1">{file.file_name}</p>
+                      <p className="text-sm mb-5" style={{ color: "rgba(255,255,255,0.35)" }}>Opens in your device&apos;s default application</p>
+                      <div className="flex gap-3 justify-center">
                         <a href={file.signedUrl} target="_blank" rel="noopener noreferrer">
-                          <Button variant="outline" size="sm" className="gap-1.5">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            Open
-                          </Button>
+                          <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white"
+                            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                            <ExternalLink className="h-4 w-4" /> Open File
+                          </button>
                         </a>
                         <a href={file.signedUrl} download={file.file_name}>
-                          <Button variant="outline" size="sm" className="gap-1.5">
-                            <Download className="h-3.5 w-3.5" />
-                            Download
-                          </Button>
+                          <button className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium"
+                            style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                            <Download className="h-4 w-4" /> Download
+                          </button>
                         </a>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </CardHeader>
-
-                <CardContent className="pt-0">
-                  {/* Image viewer */}
-                  {isImage && file.signedUrl && (
-                    <div className="rounded-xl overflow-hidden border border-border bg-muted/30">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={file.signedUrl}
-                        alt={file.file_name}
-                        className="w-full max-h-[600px] object-contain"
-                      />
-                    </div>
-                  )}
-
-                  {/* PDF viewer */}
-                  {isPdf && file.signedUrl && (
-                    <div className="rounded-xl overflow-hidden border border-border">
-                      <iframe
-                        src={`${file.signedUrl}#toolbar=1&navpanes=1`}
-                        className="w-full h-[700px]"
-                        title={file.file_name}
-                      />
-                    </div>
-                  )}
-
-                  {/* Other file types - show open button prominently */}
-                  {!isImage && !isPdf && file.signedUrl && (
-                    <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-border bg-muted/20 text-center gap-4">
-                      <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
-                        <Icon className="h-7 w-7 text-indigo-400" />
-                      </div>
-                      <div>
-                        <p className="font-medium mb-1">{file.file_name}</p>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          This file type opens in your device&apos;s default app
-                        </p>
-                        <div className="flex gap-3 justify-center">
-                          <a href={file.signedUrl} target="_blank" rel="noopener noreferrer">
-                            <Button className="gap-2">
-                              <ExternalLink className="h-4 w-4" />
-                              Open File
-                            </Button>
-                          </a>
-                          <a href={file.signedUrl} download={file.file_name}>
-                            <Button variant="outline" className="gap-2">
-                              <Download className="h-4 w-4" />
-                              Download
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!file.signedUrl && (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      File URL expired. Please re-upload to view.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                )}
+              </div>
             );
           })}
 
-          {/* Note content (extracted text) */}
+          {/* Extracted text */}
           {note.content && !note.content.startsWith("[") && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-indigo-400" />
-                  Extracted Content
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm prose-invert max-w-none">
-                  <pre className="whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed font-sans bg-muted/30 rounded-xl p-4 max-h-[400px] overflow-y-auto">
-                    {note.content.slice(0, 3000)}
-                    {note.content.length > 3000 && (
-                      "\n\n... [content truncated for display]"
-                    )}
-                  </pre>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl overflow-hidden"
+              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center gap-2 p-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                <BookOpen className="h-4 w-4" style={{ color: "#818cf8" }} />
+                <p className="text-sm font-semibold text-white">Extracted Content</p>
+              </div>
+              <div className="p-4">
+                <pre className="whitespace-pre-wrap text-xs leading-relaxed max-h-96 overflow-y-auto font-sans"
+                  style={{ color: "rgba(255,255,255,0.4)" }}>
+                  {note.content.slice(0, 3000)}
+                  {note.content.length > 3000 && "\n\n... [truncated]"}
+                </pre>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Sidebar - right 1/3 */}
-        <div className="space-y-5">
+        {/* Sidebar */}
+        <div className="space-y-4">
           {/* AI Summary */}
           {note.summary && (
-            <Card className="border-indigo-500/20 bg-indigo-500/5">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-indigo-400" />
-                  <span className="text-indigo-400">AI Summary</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {note.summary}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl p-4 relative overflow-hidden"
+              style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.18)" }}>
+              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-20"
+                style={{ background: "radial-gradient(circle, #8b5cf6, transparent)" }} />
+              <div className="flex items-center gap-2 mb-3 relative">
+                <div className="h-6 w-6 rounded-lg flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+                  <Sparkles className="h-3 w-3 text-white" />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#818cf8" }}>AI Summary</p>
+              </div>
+              <p className="text-xs leading-relaxed relative" style={{ color: "rgba(255,255,255,0.5)" }}>
+                {note.summary}
+              </p>
+            </div>
           )}
 
           {/* Tags */}
           {note.tags?.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Tag className="h-4 w-4" />
-                  Topics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {note.tags.map((tag: string) => (
-                    <span
-                      key={tag}
-                      className="px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs border border-indigo-500/20 font-medium"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl p-4"
+              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Tag className="h-4 w-4" style={{ color: "rgba(255,255,255,0.3)" }} />
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.3)" }}>Topics</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {note.tags.map((tag: string) => (
+                  <span key={tag} className="text-[11px] px-2.5 py-1 rounded-full font-medium"
+                    style={{ background: "rgba(99,102,241,0.1)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.2)" }}>
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
 
-          {/* Note info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Note Info</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Uploaded by</span>
-                <span className="font-medium">{uploaderName}</span>
+          {/* Info */}
+          <div className="rounded-2xl p-4"
+            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "rgba(255,255,255,0.3)" }}>Note Info</p>
+            {[
+              { label: "Uploaded by", value: uploaderName },
+              { label: "Uploaded", value: formatRelativeTime(note.created_at) },
+              { label: "Files", value: filesWithUrls.length.toString() },
+              { label: "Visibility", value: "Public" },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>{label}</span>
+                <span className="text-xs font-semibold text-white">{value}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Uploaded</span>
-                <span className="font-medium">{formatRelativeTime(note.created_at)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Files</span>
-                <span className="font-medium">{filesWithUrls.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Visibility</span>
-                <span className="font-medium text-green-400">Public</span>
-              </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
 
           {/* Actions */}
           <div className="space-y-2">
             <Link href="/dashboard/chat">
-              <Button className="w-full gap-2">
-                <Sparkles className="h-4 w-4" />
-                Chat with AI about this
-              </Button>
+              <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
+                style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 0 15px rgba(99,102,241,0.25)" }}>
+                <Sparkles className="h-4 w-4" /> Chat with AI
+              </button>
             </Link>
             <Link href="/dashboard/notes">
-              <Button variant="outline" className="w-full gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Browse More Notes
-              </Button>
+              <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
+                style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <ArrowLeft className="h-4 w-4" /> Browse Notes
+              </button>
             </Link>
           </div>
         </div>

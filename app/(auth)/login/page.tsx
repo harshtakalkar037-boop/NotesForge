@@ -3,10 +3,25 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Mail, Lock, Sparkles, Globe } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Mail, Lock, Sparkles, Globe, ArrowRight } from "lucide-react";
 import { login, signInWithGoogle } from "@/features/auth/actions";
+
+function InputField({ label, name, type, placeholder, icon: Icon, required, minLength }: any) {
+  return (
+    <div>
+      <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: "rgba(255,255,255,0.35)" }}>{label}</label>
+      <div className="relative">
+        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "rgba(255,255,255,0.25)" }} />
+        <input name={name} type={type} placeholder={placeholder} required={required} minLength={minLength}
+          className="w-full h-11 pl-10 pr-4 rounded-xl text-sm text-white outline-none transition-all"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+          onFocus={e => { e.target.style.border = "1px solid rgba(99,102,241,0.5)"; e.target.style.background = "rgba(99,102,241,0.06)"; }}
+          onBlur={e => { e.target.style.border = "1px solid rgba(255,255,255,0.08)"; e.target.style.background = "rgba(255,255,255,0.04)"; }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -15,14 +30,9 @@ export default function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-    const formData = new FormData(e.currentTarget);
-    const result = await login(formData);
-    if (result?.error) {
-      setError(result.error);
-      setLoading(false);
-    }
+    setLoading(true); setError(null);
+    const result = await login(new FormData(e.currentTarget));
+    if (result?.error) { setError(result.error); setLoading(false); }
   }
 
   async function handleGoogle() {
@@ -32,103 +42,86 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(99,102,241,0.15),rgba(255,255,255,0))]" />
-        <div className="absolute top-1/4 left-1/3 w-72 h-72 bg-indigo-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/3 w-72 h-72 bg-violet-500/5 rounded-full blur-3xl" />
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden" style={{ backgroundColor: "#030712" }}>
+      {/* Background orbs */}
+      <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.3, 0.15] }} transition={{ duration: 8, repeat: Infinity }}
+        className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl pointer-events-none"
+        style={{ background: "radial-gradient(circle, rgba(99,102,241,0.4), transparent)" }} />
+      <motion.div animate={{ scale: [1.2, 1, 1.2], opacity: [0.1, 0.25, 0.1] }} transition={{ duration: 10, repeat: Infinity }}
+        className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full blur-3xl pointer-events-none"
+        style={{ background: "radial-gradient(circle, rgba(139,92,246,0.3), transparent)" }} />
 
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
+      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-md relative z-10">
+
         {/* Logo */}
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 font-bold text-xl mb-6">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-              <Sparkles className="h-4.5 w-4.5 text-white h-5 w-5" />
-            </div>
-            NoteForge AI
+          <Link href="/" className="inline-flex items-center gap-2.5 mb-6 group">
+            <motion.div whileHover={{ rotate: 180 }} transition={{ duration: 0.4 }}
+              className="h-10 w-10 rounded-xl flex items-center justify-center shadow-xl"
+              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 0 30px rgba(99,102,241,0.4)" }}>
+              <Sparkles className="h-5 w-5 text-white" />
+            </motion.div>
+            <span className="font-bold text-xl text-white">NoteForge <span style={{ color: "#818cf8" }}>AI</span></span>
           </Link>
-          <h1 className="text-2xl font-bold mt-2">Welcome back</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Sign in to your account to continue
-          </p>
+          <h1 className="text-2xl font-black text-white mb-1">Welcome back</h1>
+          <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>Sign in to access the student knowledge hub</p>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-8 shadow-xl shadow-black/5">
-          {/* Google OAuth */}
-          <Button
-            variant="outline"
-            className="w-full mb-6 gap-2"
-            onClick={handleGoogle}
-            loading={googleLoading}
+        {/* Card */}
+        <div className="rounded-2xl p-7 relative overflow-hidden"
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(20px)" }}>
+          <div className="absolute top-0 left-0 right-0 h-px"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.5), transparent)" }} />
+
+          {/* Google */}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={handleGoogle} disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-2.5 h-11 rounded-xl text-sm font-semibold mb-6 transition-all"
+            style={{ background: "rgba(255,255,255,0.06)", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.1)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
           >
             <Globe className="h-4 w-4" />
-            Continue with Google
-          </Button>
+            {googleLoading ? "Connecting..." : "Continue with Google"}
+          </motion.button>
 
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
+          <div className="relative flex items-center gap-3 mb-6">
+            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
+            <span className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>or with email</span>
+            <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.07)" }} />
           </div>
 
-          {/* Error */}
           {error && (
-            <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+            <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400"
+              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
               {error}
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              name="email"
-              type="email"
-              label="Email"
-              placeholder="you@example.com"
-              icon={<Mail className="h-4 w-4" />}
-              required
-            />
-            <Input
-              name="password"
-              type="password"
-              label="Password"
-              placeholder="••••••••"
-              icon={<Lock className="h-4 w-4" />}
-              required
-            />
-
-            <div className="flex items-center justify-end">
-              <Link
-                href="#"
-                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-              >
+            <InputField label="Email" name="email" type="email" placeholder="you@example.com" icon={Mail} required />
+            <InputField label="Password" name="password" type="password" placeholder="••••••••" icon={Lock} required />
+            <div className="flex justify-end">
+              <button type="button" className="text-xs transition-colors" style={{ color: "rgba(129,140,248,0.7)" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "#818cf8")}
+                onMouseLeave={e => (e.currentTarget.style.color = "rgba(129,140,248,0.7)")}>
                 Forgot password?
-              </Link>
+              </button>
             </div>
-
-            <Button type="submit" className="w-full" size="lg" loading={loading}>
-              Sign In
-            </Button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              type="submit" disabled={loading}
+              className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all"
+              style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 0 20px rgba(99,102,241,0.3)" }}>
+              {loading ? "Signing in..." : <><span>Sign In</span><ArrowRight className="h-4 w-4" /></>}
+            </motion.button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-muted-foreground">
+          <p className="text-center text-xs mt-5" style={{ color: "rgba(255,255,255,0.3)" }}>
             Don&apos;t have an account?{" "}
-            <Link
-              href="/signup"
-              className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
-            >
+            <Link href="/signup" className="font-semibold transition-colors" style={{ color: "#818cf8" }}
+              onMouseEnter={(e: any) => (e.target.style.color = "#a78bfa")}
+              onMouseLeave={(e: any) => (e.target.style.color = "#818cf8")}>
               Sign up free
             </Link>
           </p>
