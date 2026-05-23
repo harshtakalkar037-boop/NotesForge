@@ -178,7 +178,7 @@ export async function uploadAndProcessFile(formData: FormData) {
         content: extractedText,
         summary,
         tags,
-        is_public: false,
+        is_public: true,
       })
       .select()
       .single();
