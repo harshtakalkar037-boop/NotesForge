@@ -95,11 +95,9 @@ export default async function SettingsPage() {
       {/* Settings sections */}
       <div className="grid sm:grid-cols-2 gap-4">
         {sections.map(({ id, label, icon: Icon, color }) => (
-          <div key={id} className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.02]"
+          <div key={id} className="rounded-2xl p-4 flex items-center gap-3 cursor-pointer transition-all hover:scale-[1.02] hover:bg-white/5"
             style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = `${color}30`; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
-          >
+>
             <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: `${color}15`, border: `1px solid ${color}25` }}>
               <Icon className="h-4.5 w-4.5 h-5 w-5" style={{ color }} />

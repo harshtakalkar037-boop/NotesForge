@@ -1,19 +1,9 @@
 import { createClient } from "@/supabase/server";
 import Link from "next/link";
-import { Plus, FileText, Upload, Sparkles, Clock, Search, Users, ArrowRight, Star } from "lucide-react";
+import { Plus, FileText, Upload, Sparkles, Clock, Search, Users, ArrowRight } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-const SUBJECT_COLORS: Record<string, string> = {};
-const GRADIENTS = [
-  "from-indigo-500 to-violet-500",
-  "from-blue-500 to-indigo-500",
-  "from-cyan-500 to-blue-500",
-  "from-violet-500 to-purple-500",
-  "from-pink-500 to-rose-500",
-  "from-amber-500 to-orange-500",
-];
 
 export default async function NotesPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const { q } = await searchParams;
@@ -29,6 +19,11 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
   if (q) query = query.or(`title.ilike.%${q}%,summary.ilike.%${q}%`);
   const { data: notes } = await query;
 
+  const GRADIENTS = [
+    ["#6366f1","#8b5cf6"], ["#3b82f6","#6366f1"], ["#06b6d4","#3b82f6"],
+    ["#8b5cf6","#a855f7"], ["#ec4899","#f43f5e"], ["#f59e0b","#f97316"]
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -41,30 +36,29 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
           </p>
         </div>
         <Link href="/dashboard/upload">
-          <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 active:scale-95"
+          <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95"
             style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", boxShadow: "0 0 20px rgba(99,102,241,0.3)" }}>
-            <Plus className="h-4 w-4" />
-            Share a Note
+            <Plus className="h-4 w-4" /> Share a Note
           </button>
         </Link>
       </div>
 
       {/* Search */}
-      <form method="GET" className="relative">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "rgba(255,255,255,0.25)" }} />
-        <input name="q" defaultValue={q} type="text"
-          placeholder="Search by title, subject, topic..."
-          className="w-full h-11 pl-11 pr-4 rounded-xl text-sm text-white outline-none transition-all"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)"  }}
-          onFocus={e => { e.target.style.border = "1px solid rgba(99,102,241,0.4)"; e.target.style.background = "rgba(99,102,241,0.06)"; }}
-          onBlur={e => { e.target.style.border = "1px solid rgba(255,255,255,0.07)"; e.target.style.background = "rgba(255,255,255,0.04)"; }}
-        />
-        {q && (
-          <Link href="/dashboard/notes" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium px-2 py-1 rounded-lg transition-colors"
-            style={{ color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)" }}>
-            Clear ×
-          </Link>
-        )}
+      <form method="GET">
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "rgba(255,255,255,0.25)" }} />
+          <input name="q" defaultValue={q} type="text"
+            placeholder="Search by title, subject, topic..."
+            className="w-full h-11 pl-11 pr-4 rounded-xl text-sm text-white outline-none transition-all focus:border-indigo-500/50"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+          />
+          {q && (
+            <Link href="/dashboard/notes" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium px-2 py-1 rounded-lg"
+              style={{ color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.05)" }}>
+              Clear ×
+            </Link>
+          )}
+        </div>
       </form>
 
       {/* Grid */}
@@ -77,7 +71,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
           </div>
           <p className="font-bold text-white text-lg mb-2">{q ? `No notes for "${q}"` : "No notes yet"}</p>
           <p className="text-sm mb-6 max-w-sm" style={{ color: "rgba(255,255,255,0.35)" }}>
-            {q ? "Try a different search term" : "Be the first to share your notes with the community!"}
+            {q ? "Try a different search term" : "Be the first to share your notes!"}
           </p>
           <Link href="/dashboard/upload">
             <button className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white"
@@ -91,30 +85,24 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
           {notes.map((note: any, i: number) => {
             const uploaderName = note.profiles?.full_name ?? note.profiles?.email?.split("@")[0] ?? "Anonymous";
             const isOwn = note.user_id === user?.id;
-            const gradIndex = i % GRADIENTS.length;
-            const gradColors = [
-              ["#6366f1","#8b5cf6"], ["#3b82f6","#6366f1"], ["#06b6d4","#3b82f6"],
-              ["#8b5cf6","#a855f7"], ["#ec4899","#f43f5e"], ["#f59e0b","#f97316"]
-            ][gradIndex];
-
+            const grad = GRADIENTS[i % GRADIENTS.length];
             return (
               <Link key={note.id} href={`/dashboard/notes/${note.id}`}>
-                <div className="h-full rounded-2xl p-5 transition-all duration-200 hover:-translate-y-1 group cursor-pointer relative overflow-hidden"
-                  style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)"; e.currentTarget.style.boxShadow = "0 8px 30px rgba(99,102,241,0.12)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.boxShadow = "none"; }}
-                >
-                  {/* Top color bar */}
-                  <div className="absolute top-0 left-0 right-0 h-0.5"
-                    style={{ background: `linear-gradient(90deg, ${gradColors[0]}, ${gradColors[1]})` }} />
+                <div className="h-full rounded-2xl p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg group cursor-pointer relative overflow-hidden"
+                  style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)",
+                    ["--hover-border" as any]: "rgba(99,102,241,0.3)" }}>
+                  {/* Top color accent */}
+                  <div className="absolute top-0 left-0 right-0 h-[2px]"
+                    style={{ background: `linear-gradient(90deg, ${grad[0]}, ${grad[1]})` }} />
 
                   <div className="flex items-start justify-between mb-3">
                     <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow-md"
-                      style={{ background: `linear-gradient(135deg, ${gradColors[0]}, ${gradColors[1]})` }}>
-                      <FileText className="h-4.5 w-4.5 text-white h-5 w-5" />
+                      style={{ background: `linear-gradient(135deg, ${grad[0]}, ${grad[1]})` }}>
+                      <FileText className="h-4 w-4 text-white" />
                     </div>
                     <div className="flex items-center gap-2">
-                      {isOwn && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)" }}>Yours</span>}
+                      {isOwn && <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                        style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)" }}>Yours</span>}
                       <span className="text-[11px] flex items-center gap-1" style={{ color: "rgba(255,255,255,0.25)" }}>
                         <Clock className="h-3 w-3" />{formatRelativeTime(note.created_at)}
                       </span>
@@ -127,7 +115,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
 
                   {note.summary && (
                     <div className="mb-3">
-                      <div className="flex items-center gap-1 mb-1.5">
+                      <div className="flex items-center gap-1 mb-1">
                         <Sparkles className="h-3 w-3" style={{ color: "#818cf8" }} />
                         <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#818cf8" }}>AI Summary</span>
                       </div>
@@ -150,7 +138,8 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
                     <span className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
                       by <span style={{ color: "rgba(255,255,255,0.5)" }}>{uploaderName}</span>
                     </span>
-                    <span className="text-[11px] font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "#818cf8" }}>
+                    <span className="text-[11px] font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ color: "#818cf8" }}>
                       Open <ArrowRight className="h-3 w-3" />
                     </span>
                   </div>

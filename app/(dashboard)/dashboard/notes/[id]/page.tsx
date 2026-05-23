@@ -42,11 +42,8 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Back */}
       <Link href="/dashboard/notes">
-        <button className="flex items-center gap-2 text-sm font-medium transition-all hover:translate-x-0.5"
-          style={{ color: "rgba(255,255,255,0.4)" }}
-          onMouseEnter={e => (e.currentTarget.style.color = "white")}
-          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}
-        >
+        <button className="flex items-center gap-2 text-sm font-medium transition-all hover:translate-x-0.5 hover:text-white"
+          style={{ color: "rgba(255,255,255,0.4)" }}>
           <ArrowLeft className="h-4 w-4" /> Back to Notes
         </button>
       </Link>
