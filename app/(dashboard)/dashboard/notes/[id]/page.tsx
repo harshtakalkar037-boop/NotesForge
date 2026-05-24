@@ -23,7 +23,7 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
 
   const { data: note } = await (supabase as any).from("notes").select("*").eq("id", id).single();
   if (!note) notFound();
-  if (note.user_id !== user?.id && !note.is_public) notFound();
+  // All notes are public on this platform — any logged in user can view
 
   const { data: files } = await (supabase as any).from("note_files").select("*").eq("note_id", id);
 
@@ -34,8 +34,16 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
     })
   );
 
-  const { data: profile } = await (supabase as any).from("profiles").select("full_name, email").eq("id", note.user_id).single();
-  const uploaderName = profile?.full_name ?? profile?.email?.split("@")[0] ?? "Anonymous";
+  // Fetch uploader profile
+  const { data: profile } = await (supabase as any)
+    .from("profiles")
+    .select("full_name, email")
+    .eq("id", note.user_id)
+    .maybeSingle();
+
+  const uploaderName = profile?.full_name
+    || profile?.email?.split("@")[0]
+    || "Student";
   const isOwner = user?.id === note.user_id;
 
   return (

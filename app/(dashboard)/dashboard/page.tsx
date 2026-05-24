@@ -31,12 +31,30 @@ export default function DashboardPage() {
         (supabase as any).from("notes").select("*", { count: "exact", head: true }),
         (supabase as any).from("notes").select("*", { count: "exact", head: true }).eq("user_id", user.id),
         (supabase as any).from("note_files").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-        (supabase as any).from("notes").select("id, title, created_at, user_id, profiles(full_name, email)").order("created_at", { ascending: false }).limit(6),
+        (supabase as any).from("notes").select("id, title, created_at, user_id").order("created_at", { ascending: false }).limit(6),
         (supabase as any).from("profiles").select("*", { count: "exact", head: true }),
       ]);
 
+      // Fetch profiles for recent notes
+      const userIds = [...new Set((recent ?? []).map((n: any) => n.user_id))];
+      let profileMap: Record<string, any> = {};
+      if (userIds.length > 0) {
+        const { data: profs } = await (supabase as any)
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", userIds);
+        profileMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p]));
+      }
+
+      const notesWithNames = (recent ?? []).map((n: any) => ({
+        ...n,
+        uploaderName: profileMap[n.user_id]?.full_name
+          || profileMap[n.user_id]?.email?.split("@")[0]
+          || "Student",
+      }));
+
       setStats({ totalNotes: totalNotes ?? 0, myNotes: myNotes ?? 0, totalFiles: totalFiles ?? 0, totalStudents: totalStudents ?? 0 });
-      setRecentNotes(recent ?? []);
+      setRecentNotes(notesWithNames);
       setLoading(false);
     }
 
