@@ -36,12 +36,13 @@ async function extractText(file: File): Promise<string> {
   return `[File: ${file.name}]`;
 }
 
-// ─── AI provider: Groq (free, fast, no billing needed) ───────────
-const GROQ_MODELS = [
-  "llama-3.1-8b-instant",
-  "llama3-8b-8192",
-  "llama-3.3-70b-versatile",
-  "gemma2-9b-it",
+// ─── AI provider: Google Gemini (free tier — 1500 req/day) ──────
+// Models tried in order — skips 404/429 automatically
+const GEMINI_MODELS = [
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash-latest",
+  "gemini-1.5-pro-latest",
 ];
 
 async function callAI(
@@ -49,86 +50,78 @@ async function callAI(
   systemPrompt: string,
   history?: { role: "user" | "assistant"; content: string }[]
 ): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "GROQ_API_KEY is not configured. Go to Vercel → Settings → Environment Variables and add your Groq API key. Get a free key at console.groq.com"
+      "GEMINI_API_KEY is not configured. Add it to Vercel environment variables. Get a free key at aistudio.google.com/app/apikey"
     );
   }
 
-  const messages: any[] = [
-    { role: "system", content: systemPrompt },
-    ...(history ?? []).slice(-10),
-    { role: "user", content: prompt },
+  // Build conversation for Gemini format
+  const geminiHistory = (history ?? []).slice(-8).map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+
+  const contents = [
+    ...geminiHistory,
+    { role: "user", parts: [{ text: prompt }] },
   ];
 
   const errors: string[] = [];
 
-  for (const model of GROQ_MODELS) {
+  for (const model of GEMINI_MODELS) {
     try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      const res = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.5,
-          max_tokens: 1024,
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents,
+          generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
         }),
       });
 
-      // Rate limit or server error — try next model
-      if (res.status === 429 || res.status === 503 || res.status === 500) {
-        const msg = `Model ${model}: rate limited (${res.status})`;
+      // Skip on quota or model not found
+      if (res.status === 429 || res.status === 503 || res.status === 404) {
+        const msg = `${model}: ${res.status}`;
         errors.push(msg);
-        console.warn(msg);
-        await new Promise(r => setTimeout(r, 500)); // small delay
+        console.warn(`Gemini ${msg}, trying next...`);
         continue;
       }
 
-      // Auth error — key is wrong, no point trying other models
-      if (res.status === 401 || res.status === 403) {
-        throw new Error("Invalid GROQ_API_KEY. Check your key at console.groq.com and update it in Vercel environment variables.");
-      }
-
-      // Model not found — try next
-      if (res.status === 404) {
-        const msg = `Model ${model}: not found`;
-        errors.push(msg);
-        console.warn(msg);
-        continue;
+      // Bad key
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
+        const body = await res.text();
+        throw new Error(`Invalid GEMINI_API_KEY or request error: ${body.slice(0, 150)}`);
       }
 
       if (!res.ok) {
         const errText = await res.text();
-        const msg = `Model ${model}: ${res.status} - ${errText.slice(0, 100)}`;
-        errors.push(msg);
-        console.warn(msg);
+        errors.push(`${model}: ${res.status}`);
+        console.warn(`Gemini ${model} error:`, errText.slice(0, 100));
         continue;
       }
 
       const data = await res.json();
-      const content = data.choices?.[0]?.message?.content ?? "";
-      if (!content) {
-        errors.push(`Model ${model}: empty response`);
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (!text) {
+        errors.push(`${model}: empty`);
         continue;
       }
-      return content;
+      return text;
     } catch (e: any) {
-      const msg = `Model ${model}: ${e.message}`;
-      errors.push(msg);
-      console.warn(msg);
+      if (e.message.includes("GEMINI_API_KEY") || e.message.includes("Invalid")) throw e;
+      errors.push(`${model}: ${e.message}`);
+      console.warn(`Gemini ${model} exception:`, e.message);
       continue;
     }
   }
 
-  console.error("All Groq models failed:", errors);
-  throw new Error(
-    "AI is temporarily unavailable. All models failed: " + errors.join(" | ")
-  );
+  console.error("All Gemini models failed:", errors);
+  throw new Error("AI temporarily unavailable. Please try again in a moment.");
 }
 
 // ─── AI Summary ──────────────────────────────────────────────────
@@ -136,10 +129,10 @@ async function generateSummary(
   text: string,
   title: string
 ): Promise<{ summary: string; tags: string[] }> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return {
-      summary: "Add GROQ_API_KEY to Vercel environment variables to enable AI summaries. Get a free key at console.groq.com",
+      summary: "Add GEMINI_API_KEY to Vercel environment variables to enable AI summaries. Get a free key at aistudio.google.com/app/apikey",
       tags: [],
     };
   }
