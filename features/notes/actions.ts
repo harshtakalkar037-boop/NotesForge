@@ -37,11 +37,10 @@ async function extractText(file: File): Promise<string> {
 }
 
 // ─── AI provider: Groq (free, fast, no billing needed) ───────────
-// Models in fallback order
 const GROQ_MODELS = [
   "llama-3.1-8b-instant",
   "llama3-8b-8192",
-  "mixtral-8x7b-32768",
+  "llama-3.3-70b-versatile",
   "gemma2-9b-it",
 ];
 
@@ -51,13 +50,19 @@ async function callAI(
   history?: { role: "user" | "assistant"; content: string }[]
 ): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("GROQ_API_KEY not set — add it to Vercel environment variables. Get a free key at console.groq.com");
+  if (!apiKey) {
+    throw new Error(
+      "GROQ_API_KEY is not configured. Go to Vercel → Settings → Environment Variables and add your Groq API key. Get a free key at console.groq.com"
+    );
+  }
 
   const messages: any[] = [
     { role: "system", content: systemPrompt },
     ...(history ?? []).slice(-10),
     { role: "user", content: prompt },
   ];
+
+  const errors: string[] = [];
 
   for (const model of GROQ_MODELS) {
     try {
@@ -75,27 +80,55 @@ async function callAI(
         }),
       });
 
-      if (res.status === 429 || res.status === 503) {
-        console.warn(`Groq model ${model} rate limited, trying next...`);
+      // Rate limit or server error — try next model
+      if (res.status === 429 || res.status === 503 || res.status === 500) {
+        const msg = `Model ${model}: rate limited (${res.status})`;
+        errors.push(msg);
+        console.warn(msg);
+        await new Promise(r => setTimeout(r, 500)); // small delay
+        continue;
+      }
+
+      // Auth error — key is wrong, no point trying other models
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("Invalid GROQ_API_KEY. Check your key at console.groq.com and update it in Vercel environment variables.");
+      }
+
+      // Model not found — try next
+      if (res.status === 404) {
+        const msg = `Model ${model}: not found`;
+        errors.push(msg);
+        console.warn(msg);
         continue;
       }
 
       if (!res.ok) {
-        const err = await res.text();
-        // Try next model on any error
-        console.warn(`Groq model ${model} error: ${err}`);
+        const errText = await res.text();
+        const msg = `Model ${model}: ${res.status} - ${errText.slice(0, 100)}`;
+        errors.push(msg);
+        console.warn(msg);
         continue;
       }
 
       const data = await res.json();
-      return data.choices?.[0]?.message?.content ?? "";
+      const content = data.choices?.[0]?.message?.content ?? "";
+      if (!content) {
+        errors.push(`Model ${model}: empty response`);
+        continue;
+      }
+      return content;
     } catch (e: any) {
-      console.warn(`Groq model ${model} failed:`, e.message);
+      const msg = `Model ${model}: ${e.message}`;
+      errors.push(msg);
+      console.warn(msg);
       continue;
     }
   }
 
-  throw new Error("AI service temporarily unavailable. Please try again in a moment.");
+  console.error("All Groq models failed:", errors);
+  throw new Error(
+    "AI is temporarily unavailable. All models failed: " + errors.join(" | ")
+  );
 }
 
 // ─── AI Summary ──────────────────────────────────────────────────

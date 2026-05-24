@@ -32,7 +32,14 @@ export default function ChatPage() {
     setInput("");
     setLoading(true);
     const result = await chatWithNotes(msg, [], messages);
-    setMessages((p) => [...p, { role: "assistant", content: result.reply ?? result.error ?? "Something went wrong." }]);
+    const reply = result.reply ?? result.error ?? "Something went wrong.";
+    // Show helpful message for API key issues
+    const displayReply = reply.includes("GROQ_API_KEY")
+      ? "⚠️ AI is not configured yet. The site owner needs to add a GROQ_API_KEY in Vercel. Get a free key at console.groq.com"
+      : reply.includes("Invalid GROQ_API_KEY")
+      ? "⚠️ The Groq API key is invalid or expired. Please update it in Vercel environment variables."
+      : reply;
+    setMessages((p) => [...p, { role: "assistant", content: displayReply }]);
     setLoading(false);
   }
 
