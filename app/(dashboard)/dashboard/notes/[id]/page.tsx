@@ -1,4 +1,5 @@
 import { createClient } from "@/supabase/server";
+import { createAdminClient } from "@/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -27,9 +28,13 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
 
   const { data: files } = await (supabase as any).from("note_files").select("*").eq("note_id", id);
 
+  // Use admin client to generate signed URLs — works for any user's files
+  const adminClient = createAdminClient();
   const filesWithUrls = await Promise.all(
     (files ?? []).map(async (file: any) => {
-      const { data } = await supabase.storage.from("note-files").createSignedUrl(file.storage_path, 60 * 60);
+      const { data } = await adminClient.storage
+        .from("note-files")
+        .createSignedUrl(file.storage_path, 60 * 60 * 24); // 24 hour URL
       return { ...file, signedUrl: data?.signedUrl ?? null };
     })
   );
