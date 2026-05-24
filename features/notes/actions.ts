@@ -265,7 +265,7 @@ export async function chatWithNotes(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return {
-      error: "GEMINI_API_KEY not configured. Get a free key at aistudio.google.com and add it to Vercel environment variables.",
+      reply: "👋 Hi! I'm NoteForge AI but I need to be configured first. The GEMINI_API_KEY environment variable is missing from Vercel. Go to aistudio.google.com/app/apikey to get a free key, then add it to Vercel → Settings → Environment Variables.",
     };
   }
 
@@ -299,7 +299,15 @@ Be concise, helpful, and educational. When referencing notes, mention the docume
     const reply = await callAI(message, systemPrompt, history.slice(-10));
     return { reply: reply || "I couldn't generate a response. Please try again." };
   } catch (err: any) {
-    console.error("Chat error:", err);
-    return { error: err.message ?? "Failed to get AI response." };
+    console.error("Chat error:", err.message);
+    const msg = err.message ?? "Failed to get AI response.";
+    // Return as reply so it shows in the chat bubble
+    if (msg.includes("GEMINI_API_KEY") || msg.includes("not configured")) {
+      return { reply: "👋 I need a GEMINI_API_KEY to work. Go to aistudio.google.com/app/apikey → get a free key → add it to Vercel environment variables as GEMINI_API_KEY → redeploy." };
+    }
+    if (msg.includes("Invalid GEMINI_API_KEY") || msg.includes("API key not valid")) {
+      return { reply: "⚠️ Your GEMINI_API_KEY is invalid or expired. Please get a new one at aistudio.google.com/app/apikey and update it in Vercel." };
+    }
+    return { reply: `⚠️ AI error: ${msg}` };
   }
 }

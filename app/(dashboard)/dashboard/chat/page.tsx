@@ -55,7 +55,7 @@ export default function ChatPage() {
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             AI Chat
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)" }}>
-              Powered by Groq
+              Powered by Gemini
             </span>
           </h1>
           <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>Chat with your notes using AI</p>
