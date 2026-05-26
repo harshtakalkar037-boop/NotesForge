@@ -1,26 +1,30 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json({
       status: "❌ MISSING",
-      message: "GEMINI_API_KEY is not set in environment variables",
-      fix: "Go to Vercel → Settings → Environment Variables → add GEMINI_API_KEY",
-      getKey: "https://aistudio.google.com/app/apikey",
+      message: "OPENROUTER_API_KEY is not set",
+      fix: "Go to Vercel → Settings → Environment Variables → add OPENROUTER_API_KEY",
+      getKey: "https://openrouter.ai/keys",
     }, { status: 500 });
   }
 
-  // Test with the cheapest/fastest model
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
-    const res = await fetch(url, {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+        "HTTP-Referer": "https://notes-forge-mu.vercel.app",
+        "X-Title": "NoteForge AI",
+      },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: "Reply with just: OK" }] }],
-        generationConfig: { maxOutputTokens: 10 },
+        model: "meta-llama/llama-3.1-8b-instruct:free",
+        messages: [{ role: "user", content: "Reply with just: OK" }],
+        max_tokens: 10,
       }),
     });
 
@@ -31,16 +35,16 @@ export async function GET() {
         status: "❌ API ERROR",
         httpStatus: res.status,
         error: data,
-        keyPrefix: apiKey.slice(0, 10) + "...",
+        keyPrefix: apiKey.slice(0, 15) + "...",
       }, { status: 400 });
     }
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "no text";
+    const reply = data.choices?.[0]?.message?.content ?? "no text";
     return NextResponse.json({
       status: "✅ WORKING",
-      model: "gemini-2.0-flash-lite",
+      model: "meta-llama/llama-3.1-8b-instruct:free",
       reply,
-      keyPrefix: apiKey.slice(0, 10) + "...",
+      keyPrefix: apiKey.slice(0, 15) + "...",
     });
   } catch (e: any) {
     return NextResponse.json({

@@ -34,10 +34,10 @@ export default function ChatPage() {
     const result = await chatWithNotes(msg, [], messages);
     const reply = result.reply ?? result.error ?? "Something went wrong.";
     // Show helpful message for API key issues
-    const displayReply = reply.includes("GEMINI_API_KEY")
-      ? "⚠️ AI is not configured. Add GEMINI_API_KEY to Vercel environment variables. Get a free key at aistudio.google.com/app/apikey"
-      : reply.includes("Invalid GEMINI_API_KEY")
-      ? "⚠️ The Gemini API key is invalid or expired. Please update GEMINI_API_KEY in Vercel environment variables."
+    const displayReply = reply.includes("OPENROUTER_API_KEY") || reply.includes("API key")
+      ? "⚠️ AI not configured. Add OPENROUTER_API_KEY to Vercel. Get a free key at openrouter.ai/keys"
+      : reply.includes("Invalid OPENROUTER_API_KEY")
+      ? "⚠️ Invalid API key. Please update OPENROUTER_API_KEY in Vercel environment variables."
       : reply;
     setMessages((p) => [...p, { role: "assistant", content: displayReply }]);
     setLoading(false);
@@ -55,7 +55,7 @@ export default function ChatPage() {
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             AI Chat
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)" }}>
-              Powered by Gemini
+              Powered by AI
             </span>
           </h1>
           <p className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>Chat with your notes using AI</p>
