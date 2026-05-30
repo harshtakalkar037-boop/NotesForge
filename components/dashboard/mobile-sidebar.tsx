@@ -3,14 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Sparkles, LayoutDashboard, FileText, Upload, MessageSquare, Settings } from "lucide-react";
+import { Menu, X, Sparkles, LayoutDashboard, FileText, Upload, MessageSquare, Settings, Flame, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Notes", href: "/dashboard/notes", icon: FileText },
-  { label: "Upload", href: "/dashboard/upload", icon: Upload },
+  { label: "Community Notes", href: "/dashboard/notes", icon: FileText },
+  { label: "🔥 Trending", href: "/dashboard/trending", icon: Flame },
+  { label: "Upload Note", href: "/dashboard/upload", icon: Upload },
   { label: "AI Chat", href: "/dashboard/chat", icon: MessageSquare },
+  { label: "⚡ Quiz Mode", href: "/dashboard/quiz", icon: Brain },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -21,10 +23,7 @@ export function MobileSidebar() {
   return (
     <>
       <button onClick={() => setOpen(true)} className="md:hidden p-2 rounded-lg transition-colors"
-        style={{ color: "rgba(255,255,255,0.5)" }}
-        onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
-        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-      >
+        style={{ color: "rgba(255,255,255,0.5)" }}>
         <Menu className="h-5 w-5" />
       </button>
 
@@ -33,12 +32,12 @@ export function MobileSidebar() {
           style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} />
       )}
 
-      <div className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-300 md:hidden",
-        open ? "translate-x-0" : "-translate-x-full"
-      )} style={{ backgroundColor: "#060610", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className={cn("fixed inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-300 md:hidden",
+        open ? "translate-x-0" : "-translate-x-full")}
+        style={{ backgroundColor: "#060610", borderRight: "1px solid rgba(255,255,255,0.07)" }}>
 
-        <div className="h-16 flex items-center justify-between px-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+        <div className="h-16 flex items-center justify-between px-5 shrink-0"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
           <Link href="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
             <div className="h-8 w-8 rounded-xl flex items-center justify-center"
               style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
@@ -51,7 +50,7 @@ export function MobileSidebar() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-5 space-y-0.5">
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
