@@ -36,25 +36,12 @@ async function extractText(file: File): Promise<string> {
   return `[File: ${file.name}]`;
 }
 
-// ─── AI provider: OpenRouter (free models, no billing required) ──
-// Free models: meta-llama/llama-3.1-8b-instruct:free, etc.
-// Get free key at: openrouter.ai/keys
-const FREE_MODELS = [
-  "meta-llama/llama-3.1-8b-instruct:free",
-  "mistralai/mistral-7b-instruct:free",
-  "google/gemma-2-9b-it:free",
-  "microsoft/phi-3-mini-128k-instruct:free",
-];
-
+// ─── Multi-provider AI (tries each until one works) ──────────────
 async function callAI(
   prompt: string,
   systemPrompt: string,
   history?: { role: "user" | "assistant"; content: string }[]
 ): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY not configured");
-  }
 
   const messages = [
     { role: "system", content: systemPrompt },
@@ -64,53 +51,78 @@ async function callAI(
 
   const errors: string[] = [];
 
-  for (const model of FREE_MODELS) {
-    try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-          "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://notes-forge-mu.vercel.app",
-          "X-Title": "NoteForge AI",
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.5,
-          max_tokens: 1024,
-        }),
-      });
-
-      if (res.status === 401 || res.status === 403) {
-        throw new Error("Invalid OPENROUTER_API_KEY");
-      }
-
-      if (res.status === 429 || res.status === 503) {
-        errors.push(`${model}: rate limited`);
-        continue;
-      }
-
-      if (!res.ok) {
-        const errText = await res.text();
-        errors.push(`${model}: ${res.status}`);
-        console.warn(`OpenRouter ${model}:`, errText.slice(0, 100));
-        continue;
-      }
-
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content ?? "";
-      if (!text) { errors.push(`${model}: empty`); continue; }
-      return text;
-    } catch (e: any) {
-      if (e.message.includes("OPENROUTER_API_KEY") || e.message.includes("Invalid")) throw e;
-      errors.push(`${model}: ${e.message}`);
-      continue;
+  // ── Provider 1: OpenRouter (free models) ──
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (openrouterKey) {
+    const orModels = [
+      "meta-llama/llama-3.1-8b-instruct:free",
+      "mistralai/mistral-7b-instruct:free",
+      "google/gemma-2-9b-it:free",
+    ];
+    for (const model of orModels) {
+      try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openrouterKey}`,
+            "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "https://notes-forge-mu.vercel.app",
+            "X-Title": "NoteForge AI",
+          },
+          body: JSON.stringify({ model, messages, temperature: 0.5, max_tokens: 1024 }),
+        });
+        if (res.status === 429 || res.status === 503 || res.status === 402) { errors.push(`OR/${model}: ${res.status}`); continue; }
+        if (!res.ok) { errors.push(`OR/${model}: ${res.status}`); continue; }
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content ?? "";
+        if (text) return text;
+        errors.push(`OR/${model}: empty`);
+      } catch (e: any) { errors.push(`OR/${model}: ${e.message}`); }
     }
   }
 
-  console.error("All models failed:", errors);
-  throw new Error("AI temporarily unavailable. Please try again.");
+  // ── Provider 2: Gemini (Google AI Studio free tier) ──
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    const geminiModels = ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-1.5-flash-latest"];
+    for (const model of geminiModels) {
+      try {
+        const geminiContents = [
+          ...(history ?? []).slice(-8).map(m => ({
+            role: m.role === "assistant" ? "model" : "user",
+            parts: [{ text: m.content }],
+          })),
+          { role: "user", parts: [{ text: prompt }] },
+        ];
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: systemPrompt }] },
+              contents: geminiContents,
+              generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
+            }),
+          }
+        );
+        if (res.status === 429 || res.status === 404 || res.status === 503) { errors.push(`Gemini/${model}: ${res.status}`); continue; }
+        if (!res.ok) { errors.push(`Gemini/${model}: ${res.status}`); continue; }
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) return text;
+        errors.push(`Gemini/${model}: empty`);
+      } catch (e: any) { errors.push(`Gemini/${model}: ${e.message}`); }
+    }
+  }
+
+  // ── No keys configured ──
+  if (!openrouterKey && !geminiKey) {
+    throw new Error("NO_API_KEY");
+  }
+
+  console.error("All AI providers failed:", errors);
+  throw new Error("AI temporarily unavailable. Please try again in a moment.");
 }
 
 // ─── AI Summary ──────────────────────────────────────────────────
@@ -118,10 +130,10 @@ async function generateSummary(
   text: string,
   title: string
 ): Promise<{ summary: string; tags: string[] }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
+  const hasKey = process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY;
+  if (!hasKey) {
     return {
-      summary: "AI summaries not configured. Add OPENROUTER_API_KEY to Vercel. Get a free key at openrouter.ai/keys",
+      summary: "Add OPENROUTER_API_KEY or GEMINI_API_KEY to Vercel to enable AI summaries.",
       tags: [],
     };
   }
@@ -251,12 +263,7 @@ export async function chatWithNotes(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Not authenticated." };
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return {
-      reply: "👋 Hi! I need an API key to work. Add OPENROUTER_API_KEY to Vercel environment variables. Get a completely free key at openrouter.ai/keys — no credit card needed!",
-    };
-  }
+  // Key check happens inside callAI — if no keys, it throws NO_API_KEY
 
   // Fetch notes context
   const { data: notes } = await (supabase as any)
@@ -289,14 +296,12 @@ Be concise, helpful, and educational. When referencing notes, mention the docume
     return { reply: reply || "I couldn't generate a response. Please try again." };
   } catch (err: any) {
     console.error("Chat error:", err.message);
-    const msg = err.message ?? "Failed to get AI response.";
-    // Return as reply so it shows in the chat bubble
-    if (msg.includes("GEMINI_API_KEY") || msg.includes("not configured")) {
-      return { reply: "👋 I need a GEMINI_API_KEY to work. Go to aistudio.google.com/app/apikey → get a free key → add it to Vercel environment variables as GEMINI_API_KEY → redeploy." };
+    const msg = err.message ?? "";
+    if (msg === "NO_API_KEY") {
+      return {
+        reply: "No AI key set. Add OPENROUTER_API_KEY (openrouter.ai/keys) or GEMINI_API_KEY (aistudio.google.com/app/apikey) to Vercel env vars."
+      };
     }
-    if (msg.includes("Invalid GEMINI_API_KEY") || msg.includes("API key not valid")) {
-      return { reply: "⚠️ Your GEMINI_API_KEY is invalid or expired. Please get a new one at aistudio.google.com/app/apikey and update it in Vercel." };
-    }
-    return { reply: `⚠️ AI error: ${msg}` };
+    return { reply: `⚠️ ${msg || "AI temporarily unavailable. Please try again."}` };
   }
 }
